@@ -25,6 +25,7 @@ RUN echo "deb http://ppa.launchpad.net/maarten-fonville/protobuf/ubuntu trusty m
 RUN sudo apt-get update && sudo apt-get install -y \
     make graphviz gnupg protobuf-compiler \
     xvfb libgtk2.0-0 libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 \
+    rsync \
     && sudo rm -rf /var/lib/apt/lists/*
 
 # install nvm
@@ -32,7 +33,7 @@ RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.34.0/install.sh
 
 # node vars
 ARG NVM_DIR=$HOME/.nvm
-ARG NODE_VERSION=v10.16.3
+ARG NODE_VERSION=v10.17.0
 
 # install yarn
 RUN source $NVM_DIR/nvm.sh \
@@ -53,9 +54,13 @@ RUN python -m venv venv \
 
 # python path
 ENV PATH $APP/venv/bin:$PATH
+# ENV PATH $HOME/.nvm/versions/node/v10.17.0/lib/node_modules/yarn/bin/:$PATH
+RUN echo $NVM_DIR/versions/node/$NODE_VERSION/bin
 
 # copy package.json
 COPY --chown=$USER frontend/package.json frontend/yarn.lock ./frontend/
+
+# RUN find / -iname yarn -executable -type f
 
 # install node modules
 RUN make react-init
@@ -65,13 +70,20 @@ COPY --chown=$USER lib/Pipfile.locks/python-3.7.4 ./lib/Pipfile.locks/
 COPY --chown=$USER lib/Pipfile ./lib/
 
 # install python modules
-RUN source venv/bin/activate && make pipenv-lock CIRCLECI=true
+RUN source venv/bin/activate && make setup && make pipenv-lock CIRCLECI=true && deactivate
 
 # copy streamlit code
 COPY --chown=$USER . .
 
 # install streamlit
+# RUN make init
+RUN make scssvars
+RUN make protobuf
 RUN make develop
+RUN make build
+RUN make install
+RUN make pycoverage
+RUN make wheel
 
 # register streamlit user
 RUN mkdir $HOME/.streamlit \
